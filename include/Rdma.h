@@ -121,7 +121,7 @@ bool rdmaWrite(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t size,
                bool isSignaled = true, uint64_t wrID = 0);
 
 bool rdmaFetchAndAdd(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t add,
-                     uint32_t lkey, uint32_t remoteRKey);
+                     uint32_t lkey, uint32_t remoteRKey, bool signal = true, uint64_t wrID = 0);
 bool rdmaFetchAndAddBoundary(ibv_qp *qp, int log_sz, uint64_t source,
                              uint64_t dest, uint64_t add, uint32_t lkey,
                              uint32_t remoteRKey, uint64_t boundary,
