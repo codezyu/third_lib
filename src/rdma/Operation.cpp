@@ -367,6 +367,39 @@ bool rdmaCasRead(ibv_qp *qp, const RdmaOpRegion &cas_ror,
   return true;
 }
 
+bool rdmaReadCas(ibv_qp *qp, const RdmaOpRegion &read_ror,
+                 const RdmaOpRegion &cas_ror, uint64_t compare, uint64_t swap,
+                 bool isSignaled, uint64_t wrID) {
+
+  struct ibv_sge sg[2];
+  struct ibv_send_wr wr[2];
+  struct ibv_send_wr *wrBad;
+
+  fillSgeWr(sg[0], wr[0], read_ror.source, read_ror.size, read_ror.lkey);
+  wr[0].opcode = IBV_WR_RDMA_READ;
+  wr[0].wr.rdma.remote_addr = cas_ror.dest;
+  wr[0].wr.rdma.rkey = cas_ror.remoteRKey;
+  wr[0].next = &wr[1];
+
+  fillSgeWr(sg[1], wr[1], cas_ror.source, 8, cas_ror.lkey);
+  wr[1].opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
+  wr[1].wr.atomic.remote_addr = read_ror.dest;
+  wr[1].wr.atomic.rkey = read_ror.remoteRKey;
+  wr[1].wr.atomic.compare_add = compare;
+  wr[1].wr.atomic.swap = swap;
+  wr[1].wr_id = wrID;
+  // wr[1].send_flags |= IBV_SEND_FENCE;
+  if (isSignaled) {
+    wr[1].send_flags |= IBV_SEND_SIGNALED;
+  }
+
+  if (ibv_post_send(qp, &wr[0], &wrBad)) {
+    Debug::notifyError("Send with CAS_READs failed.");
+    sleep(10);
+    return false;
+  }
+  return true;
+}
 bool rdmaFaaRead(ibv_qp *qp, const RdmaOpRegion &faa_ror,
                  const RdmaOpRegion &read_ror, uint64_t add, bool isSignaled,
                  uint64_t wrID) {
@@ -464,6 +497,40 @@ bool rdmaWriteCas(ibv_qp *qp, const RdmaOpRegion &write_ror,
 
   if (ibv_post_send(qp, &wr[0], &wrBad)) {
     Debug::notifyError("Send with Write Cas failed.");
+    sleep(10);
+    return false;
+  }
+  return true;
+}
+
+bool rdmaCasWrite(ibv_qp *qp, const RdmaOpRegion &cas_ror,
+                  const RdmaOpRegion &write_ror, uint64_t compare, uint64_t swap,
+                  bool isSignaled, uint64_t wrID) {
+
+  struct ibv_sge sg[2];
+  struct ibv_send_wr wr[2];
+  struct ibv_send_wr *wrBad;
+
+  fillSgeWr(sg[0], wr[0], cas_ror.source, 8, cas_ror.lkey);
+  wr[0].opcode = IBV_WR_ATOMIC_CMP_AND_SWP;
+  wr[0].wr.atomic.remote_addr = cas_ror.dest;
+  wr[0].wr.atomic.rkey = cas_ror.remoteRKey;
+  wr[0].wr.atomic.compare_add = compare;
+  wr[0].wr.atomic.swap = swap;
+  wr[0].next = &wr[1];
+
+  fillSgeWr(sg[1], wr[1], write_ror.source, write_ror.size, write_ror.lkey);
+  wr[1].opcode = IBV_WR_RDMA_WRITE;
+  wr[1].wr.rdma.remote_addr = write_ror.dest;
+  wr[1].wr.rdma.rkey = write_ror.remoteRKey;
+  wr[1].wr_id = wrID;
+  // wr[1].send_flags |= IBV_SEND_FENCE;
+  if (isSignaled) {
+    wr[1].send_flags |= IBV_SEND_SIGNALED;
+  }
+
+  if (ibv_post_send(qp, &wr[0], &wrBad)) {
+    Debug::notifyError("Send with CAS_WRITEs failed.");
     sleep(10);
     return false;
   }
