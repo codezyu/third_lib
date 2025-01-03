@@ -19,8 +19,17 @@
 #define UD_PKEY 0x11111111
 #define PSN 3185
 #define MAX_INLINE_DATA 316
+#define NET_DEV_NAME "enp202s0f0" // [CONFIG] enp202s0f0   (check from ifconfig)
+#define IB_DEV_NAME_IDX '2'       // [CONFIG] 2            (check from ibdev2netdev)
+#define MLX_PORT 1                // [CONFIG] 1            (check from ibdev2netdev)
+#define MLX_GID 1                 // [CONFIG] 1            (check from show_gids)
+#define IBV_MTU IBV_MTU_4096      // [CONFIG] IBV_MTU_4096 (check from ifconfig)
+#define MAX_ATOMIC_ARG 32         // [CONFIG] 32
+#define ON_CHIP_SIZE 128
 
 constexpr int kOroMax = 3;
+constexpr int kQPMaxDepth = 4096;
+constexpr int kInlineDataMax = 220;
 struct RdmaOpRegion {
   uint64_t source;
   uint64_t dest;
@@ -112,7 +121,7 @@ bool rdmaWrite(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t size,
                bool isSignaled = true, uint64_t wrID = 0);
 
 bool rdmaFetchAndAdd(ibv_qp *qp, uint64_t source, uint64_t dest, uint64_t add,
-                     uint32_t lkey, uint32_t remoteRKey);
+                     uint32_t lkey, uint32_t remoteRKey, bool signal = true, uint64_t wrID = 0);
 bool rdmaFetchAndAddBoundary(ibv_qp *qp, int log_sz, uint64_t source,
                              uint64_t dest, uint64_t add, uint32_t lkey,
                              uint32_t remoteRKey, uint64_t boundary,
@@ -134,27 +143,31 @@ void checkDMSupported(struct ibv_context *ctx);
 
 
 //// specified
+// batch
 bool rdmaWriteBatch(ibv_qp *qp, RdmaOpRegion *ror, int k, bool isSignaled,
                     uint64_t wrID = 0);
 bool rdmaReadBatch(ibv_qp *qp, RdmaOpRegion *ror, int k, bool isSignaled,
                    uint64_t wrID = 0);
+// CAS READ
 bool rdmaCasRead(ibv_qp *qp, const RdmaOpRegion &cas_ror,
                  const RdmaOpRegion &read_ror, uint64_t compare, uint64_t swap,
                  bool isSignaled, uint64_t wrID = 0);
+bool rdmaReadCas(ibv_qp *qp, const RdmaOpRegion &read_ror,
+                 const RdmaOpRegion &cas_ror, uint64_t compare, uint64_t swap,
+                 bool isSignaled, uint64_t wrID = 0);
+// FAA READ
 bool rdmaFaaRead(ibv_qp *qp, const RdmaOpRegion &faab_ror,
                  const RdmaOpRegion &read_ror, uint64_t add, bool isSignaled,
                  uint64_t wr_id = 0);
-bool rdmaFaaBoundRead(ibv_qp *qp, const RdmaOpRegion &faab_ror,
-                      const RdmaOpRegion &read_ror, uint64_t add,
-                      uint64_t boundary, bool isSignaled, uint64_t wr_id = 0);
-bool rdmaCasMaskWrite(ibv_qp *qp, const RdmaOpRegion &cas_ror, uint64_t equal,
-                      uint64_t swap, uint64_t mask,
-                      const RdmaOpRegion &write_ror, bool isSignaled,
-                      uint64_t wr_id = 0);
+
+bool rdmaCasWrite(ibv_qp *qp, const RdmaOpRegion &cas_ror,
+                  const RdmaOpRegion &write_ror, uint64_t compare, uint64_t swap,
+                  bool isSignaled, uint64_t wrID = 0);
 bool rdmaWriteFaa(ibv_qp *qp, const RdmaOpRegion &write_ror,
                   const RdmaOpRegion &faa_ror, uint64_t add_val,
                   bool isSignaled, uint64_t wrID = 0);
 bool rdmaWriteCas(ibv_qp *qp, const RdmaOpRegion &write_ror,
                   const RdmaOpRegion &cas_ror, uint64_t compare, uint64_t swap,
-                  bool isSignaled, uint64_t wrID = 0);                 
+                  bool isSignaled, uint64_t wrID = 0);
+              
 #endif
